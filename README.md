@@ -1,4 +1,8 @@
 # Web-Scraping with Scrapy: Spiders and Utilities
+This repository contains working code for web-scraping with scrapy and MongoDB (see below), it contains code for URL scraping, introductions to BeautifulSoup, and other assorted legacy and utility scripts. The scrapy code comes from the [command-line scrapy repo](https://github.com/URAP-charter/web_scraping) and was frozen on January 18th, 2022. That repo now contains more up-to-date, but less flexible code for distributed web-crawling with scrapy. For a universal crawling web-portal, please check out the [scrapy server repo](https://github.com/URAP-charter/scraping_server).
+
+## Introduction
+
 Our goal is a scalable, robust web-crawling pipeline (in Python) applicable across web designs and accessible for researchers with minimal computational skills. Our method involves using Scrapy spiders to recursively gather website links (to a given depth), collect and parse items (text, images, PDFs, and .docs) using BeautifulSoup and textract, and saving them locally and/or to MongoDB. 
 
 The most recent web scraper is `scrapy/schools/schools/spiders/scrapy_vanilla.py`. See usage notes below.
@@ -18,8 +22,7 @@ You'll get best results if you deploy the spider from within a scrapy project, l
 
 ### Method 1: install and run locally
 
-If not yet installed, [install MongoDB](https://docs.mongodb.com/manual/installation/).
-
+#### Install dependencies
 Navigate to the `/web_scraping/scrapy/schools` directory.
 Then run the following commands:
 ```bash
@@ -29,23 +32,25 @@ source .venv/bin/activate
 # Install dependencies.
 pip3 install -r requirements.txt
 ```
-If you want to store results into MongoDB, ensure that:
 
+#### Optional: Store crawling output to MongoDB 
+If not yet installed, [install MongoDB](https://docs.mongodb.com/manual/installation/).
+
+Ensure that this key-value pair of `ITEM_PIPELINES` in `/web_scraping/scrapy/schools/schools/settings.py` is NOT commented out:
 ```python
 'schools.pipelines.MongoDBPipeline': 300
 ```
-is one of the key-value pairs of `ITEM_PIPELINES` in `/web_scraping/scrapy/schools/schools/settings.py` by uncommenting the line. If you don't want to use the pipeline, remove the element.
+**If you DON'T want to use the MongoDB pipeline (e.g., you only want to store results locally), remove this element.**
 
-Furthermore, ensure that in `/web_scraping/scrapy/schools/schools/settings.py`, that:
+Also make sure that in `/web_scraping/scrapy/schools/schools/settings.py`:
 ```python
 # This next line must NOT be commented.
 MONGO_URI = 'mongodb://localhost:27017' 
 # This next line is commented.
 # MONGO_URI = 'mongodb://mongodb_container:27017'
 
-Also, ensure the line
+# This line also must NOT be commented
 MONGO_DATABASE = 'schoolSpider'
-is uncommented.
 ```
 Start MongoDB. This step depends on the operating system. On Ubuntu 18.04, this is:
 ```bash
@@ -61,7 +66,8 @@ To stop MongoDB running in Docker:
 docker stop mongodb
 ```
 
-Finally to run, navigate to `/web_scraping/scrapy/schools/schools/` and run:
+#### Run instructions
+Finally, navigate to `/web_scraping/scrapy/schools/schools/` and run:
 
 ```bash
 scrapy crawl schoolspider -a school_list=spiders/test_urls.csv -o schoolspider_output.json
@@ -72,7 +78,7 @@ and append the output to a json file. Note that subsequent runs of the crawler w
 Appending to a json file is optional and the crawler can be run without doing this. Not specified in this command, is that data is saved behind the scenes
 to a MongoDB database named "schoolSpider" if the MongoDB pipeline is used.
 
-## Adding Logging
+### Adding Logging
 To add a log output file, you'll need to add '-L' and '--logfile' flags. The -L flag specifies the level of logging, such as 'INFO', 'DEBUG', or 'ERROR', and specifies what types of log messages appear in the log file. The --logfile flag specifies the output file location, such as './schoolspider\_log\_1\_1\_2021.log'
 
 A sample command with a log file:
@@ -87,7 +93,7 @@ When you're finished and you don't need to run the scraper anymore run:
 deactivate
 ```
 
-### Method 2: install and run in a container.
+### Method 2: install and run in a container
 
 Firstly, [get Docker](https://docs.docker.com/get-docker/).
 
@@ -158,7 +164,7 @@ curl -X POST -d 'file=@path/to/your/csv/file.csv' localhost:5000/job
 
 7. Gathered data can be found in 2 places. First, parsed text data and file/image urls are stored as objects in Mongo in the schoolSpider database. Second, raw files and images are stored locally, in "files/" and "images/" directories. TODO: modify the file and image pipelines so that they get stored to Mongo (which can handle raw files like that)
 
-#### Simpler instructions using `docker-compose`
+#### Simpler API instructions using `docker-compose`
 
 1. Make sure you have Docker and Docker-Compose installed
 
@@ -171,14 +177,3 @@ curl -X POST -d 'file=@path/to/your/csv/file.csv' localhost:5000/job
 5. From there, you can check the status (work in progress -- it says it's done when it's still running): "curl localhost:5000/task?task_id=" + the "job_id" from the last CURL command
 
 6. Or check Mongo: "docker exec -it mongodb_container bash" "mongo -u admin -p mdipass" "show dbs" "use schoolSpider" "db.otherItems.count()" "db.otherItems.find_one()" etc...
-
-Next Steps for this Method:
-- Listen to see when tasks finish -- have a workaround when tasks are requested via API, but this is a hacked solution
-- Add user id/info to tasks put into Mongo (functionality exists in crawlTaskTracker.py, but needs that information to be drawn out/passed from the client). This also allows us to do things like "get all tasks by a user"
-- Put files and images into Mongo instead of local -- with the option for multiple users to start crawling, we want their crawled files to be accessible/stored!
-
-
-## Updates to come
-- Distributed crawling: Coordinating spiders vertically using instances of scrapyd and a big data platform with Spark, Hadoop, and HIVE
-- Error checking: Middlewares to check crawling fidelity and backup crawling approach (wget)
-- Crawling history: Crawling websites over time using Internet Archive ([see example code here](http://sangaline.com/post/wayback-machine-scraper/))
